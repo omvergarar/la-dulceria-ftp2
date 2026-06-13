@@ -13,28 +13,39 @@ jobs:
     steps:
       - name: Checkout repositorio
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Instalar lftp
         run: sudo apt-get install -y lftp
 
-      - name: Deploy tema
+      - name: Subir solo archivos modificados
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
         run: |
-          lftp -c "
-            set ftp:ssl-allow no;
-            set ssl:verify-certificate no;
-            open -u $FTP_USERNAME,$FTP_PASSWORD $FTP_SERVER;
-            mirror -R --verbose --transfer-all \
-              wp-content/themes/la-dulceria/ \
-              /public_html/wp-content/themes/la-dulceria/;
-            mirror -R --verbose --transfer-all \
-              wp-content/plugins/dulceria-features/ \
-              /public_html/wp-content/plugins/dulceria-features/;
-            mirror -R --verbose --transfer-all \
-              wp-content/plugins/dulceria-wompi/ \
-              /public_html/wp-content/plugins/dulceria-wompi/;
-            bye
-          "
+          CHANGED=$(git diff --name-only HEAD~1 HEAD -- wp-content/)
+          echo "Archivos cambiados:"
+          echo "$CHANGED"
+
+          if [ -z "$CHANGED" ]; then
+            echo "Sin cambios en wp-content/, nada que subir."
+            exit 0
+          fi
+
+          for FILE in $CHANGED; do
+            if [ -f "$FILE" ]; then
+              REMOTE_PATH="/public_html/${FILE}"
+              REMOTE_DIR=$(dirname "$REMOTE_PATH")
+              echo "Subiendo $FILE -> $REMOTE_PATH"
+              lftp -c "
+                set ftp:ssl-allow no;
+                set ssl:verify-certificate no;
+                open -u $FTP_USERNAME,$FTP_PASSWORD $FTP_SERVER;
+                mkdir -p $REMOTE_DIR;
+                put $FILE -o $REMOTE_PATH;
+                bye
+              "
+            fi
+          done
