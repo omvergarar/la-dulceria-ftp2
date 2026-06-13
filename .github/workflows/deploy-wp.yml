@@ -19,18 +19,24 @@ jobs:
       - name: Instalar lftp
         run: sudo apt-get install -y lftp
 
-      - name: Subir solo archivos modificados
+      - name: Subir archivos modificados
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
         run: |
-          CHANGED=$(git diff --name-only HEAD~1 HEAD -- wp-content/)
-          echo "Archivos cambiados:"
+          echo "=== Commits disponibles ==="
+          git log --oneline -3
+
+          echo "=== Archivos cambiados ==="
+          git diff HEAD~1 HEAD --name-only
+
+          CHANGED=$(git diff HEAD~1 HEAD --name-only | grep "^wp-content/")
+          echo "=== Archivos wp-content cambiados ==="
           echo "$CHANGED"
 
           if [ -z "$CHANGED" ]; then
-            echo "Sin cambios en wp-content/, nada que subir."
+            echo "Sin cambios en wp-content/"
             exit 0
           fi
 
@@ -38,14 +44,18 @@ jobs:
             if [ -f "$FILE" ]; then
               REMOTE_PATH="/public_html/${FILE}"
               REMOTE_DIR=$(dirname "$REMOTE_PATH")
-              echo "Subiendo $FILE -> $REMOTE_PATH"
+              echo "Subiendo: $FILE -> $REMOTE_PATH"
               lftp -c "
                 set ftp:ssl-allow no;
                 set ssl:verify-certificate no;
                 open -u $FTP_USERNAME,$FTP_PASSWORD $FTP_SERVER;
-                mkdir -p $REMOTE_DIR;
+                mkdir -fp $REMOTE_DIR;
                 put $FILE -o $REMOTE_PATH;
                 bye
               "
+              echo "OK: $FILE"
+            else
+              echo "SKIP (eliminado): $FILE"
             fi
           done
+          echo "Deploy completado."
