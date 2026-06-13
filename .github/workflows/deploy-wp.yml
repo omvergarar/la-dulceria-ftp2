@@ -27,7 +27,7 @@ jobs:
             set ftp:ssl-allow no;
             set ssl:verify-certificate no;
             open -u $FTP_USERNAME,$FTP_PASSWORD $FTP_SERVER;
-            mirror -R --delete --verbose \
+            mirror -R --verbose \
               wp-content/ \
               /public_html/wp-content/;
             bye
