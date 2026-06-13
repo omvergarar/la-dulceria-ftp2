@@ -37,9 +37,17 @@ jobs:
           for FILE in $CHANGED; do
             if [ -f "$FILE" ]; then
               REMOTE_PATH="/public_html/${FILE}"
-              REMOTE_DIR=$(dirname "$REMOTE_PATH")
-              echo "Subiendo: $FILE"
-              lftp -c "set ftp:ssl-allow no; set ssl:verify-certificate no; open -u $FTP_USERNAME,$FTP_PASSWORD $FTP_SERVER; put $FILE -o $REMOTE_PATH; bye"
+              echo "Subiendo: $FILE -> $REMOTE_PATH"
+              lftp -d -c "
+                set ftp:ssl-allow no;
+                set ssl:verify-certificate no;
+                set net:timeout 30;
+                set net:max-retries 3;
+                open -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" $FTP_SERVER;
+                put \"$FILE\" -o \"$REMOTE_PATH\";
+                bye
+              " 2>&1
+              echo "Exit code lftp: $?"
             fi
           done
           echo "Deploy completado."
